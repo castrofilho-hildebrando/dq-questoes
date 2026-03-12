@@ -58,7 +58,8 @@ export function RequireCpfDialog({ open, userId, onSaved }: RequireCpfDialogProp
 
       const { error } = await supabase
         .from("profiles")
-        .upsert({ user_id: userId, cpf: formatted }, { onConflict: "user_id" });
+        .update({ cpf: formatted })
+        .eq("user_id", userId);
 
       if (error) throw error;
 
