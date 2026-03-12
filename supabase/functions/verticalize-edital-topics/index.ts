@@ -40,9 +40,9 @@ serve(async (req) => {
 
     console.log('User authenticated:', claimsData.claims.sub);
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY is not configured");
     }
 
     const { editalText, disciplineName, model, systemPrompt: customPrompt } = await req.json();
@@ -73,7 +73,7 @@ REGRAS CRÍTICAS:
 Responda usando a função verticalize_topics.`;
 
     const systemPrompt = customPrompt || defaultPrompt;
-    const selectedModel = model || "google/gemini-3-flash-preview";
+    const selectedModel = model || "gpt-4o";
 
     const userPrompt = `## Disciplina: ${disciplineName || 'Não especificada'}
 
@@ -82,10 +82,10 @@ ${editalText}
 
 Separe cada tópico preservando o texto exato como está no edital. Não altere a redação.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -109,7 +109,7 @@ Separe cada tópico preservando o texto exato como está no edital. Não altere 
                     items: {
                       type: "object",
                       properties: {
-                        name: { 
+                        name: {
                           type: "string",
                           description: "Nome do tópico verticalizado"
                         },
@@ -144,7 +144,7 @@ Separe cada tópico preservando o texto exato como está no edital. Não altere 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI gateway error:", response.status, errorText);
-      
+
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Tente novamente em alguns segundos." }), {
           status: 429,
@@ -157,7 +157,7 @@ Separe cada tópico preservando o texto exato como está no edital. Não altere 
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      
+
       throw new Error(`AI gateway error: ${response.status}`);
     }
 

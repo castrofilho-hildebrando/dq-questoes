@@ -27,10 +27,10 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
 
-    if (!lovableApiKey) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    if (!geminiApiKey) {
+      throw new Error("GEMINI_API_KEY is not configured");
     }
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -114,7 +114,7 @@ serve(async (req) => {
         }
         pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
       }
-      
+
       // Chunked base64 conversion to avoid stack overflow on large files
       let binary = "";
       const chunkSize = 8192;
@@ -128,10 +128,10 @@ serve(async (req) => {
 
       console.log("Sending PDF to AI for topic extraction, size:", pdfBytes.length);
 
-      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const aiResp = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${lovableApiKey}`,
+          Authorization: `Bearer ${geminiApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -346,8 +346,6 @@ serve(async (req) => {
     const modelSettings = promptData.model_settings as Record<string, unknown> | null;
 
     // ── Extract structured fields from JSON statement for prompt variables ──
-    // When the statement is JSON (e.g. Fundação Osório), extract tema/comando/topico
-    // so they're available as standalone prompt variables
     let statementTema = "";
     let statementComando = "";
     let statementTopico = "";
@@ -355,7 +353,6 @@ serve(async (req) => {
       try {
         const stmtParsed = JSON.parse(questionStatement.trim().replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim());
         if (typeof stmtParsed === "object" && stmtParsed !== null) {
-          // Flat structure: {tema, comando, topico}
           statementTema = stmtParsed.tema || stmtParsed.question?.tema || "";
           statementComando = stmtParsed.comando || stmtParsed.question?.comando || "";
           statementTopico = stmtParsed.topico || stmtParsed.ponto_tematico || stmtParsed.question?.ponto_tematico || "";
@@ -366,45 +363,35 @@ serve(async (req) => {
     }
 
     // Build prompt with variable substitution
-    // Support both {var} and {{var}} formats used in prompts
-    // IMPORTANT: Map ALL variable names used in prompt templates
     const replacements: Record<string, string> = {
-      // Topic
       topico: topicTitle || statementTopico,
       topic_title: topicTitle || statementTopico,
       topic_id: topicId,
-      // Statement / Enunciado (prompts use both names)
       enunciado: questionStatement,
       statement: questionStatement,
-      // Extracted fields from JSON statements
       tema: statementTema,
       comando: statementComando,
-      // Answer key / Padrão de resposta (prompts use both names)
       padrao_resposta: questionAnswerKey,
       padrao_resposta_json: questionAnswerKey,
-      // Discipline
       disciplina: disciplineName,
       discipline_name: disciplineName,
-      // Course
       course_name: courseName,
-      // Exam context
       exam_context_json: examContextJson,
     };
 
     let fullPrompt = promptTemplate;
     for (const [key, value] of Object.entries(replacements)) {
-      // Match both {key} and {{key}} patterns
       const regex = new RegExp(`\\{\\{?${key}\\}?\\}`, "g");
       fullPrompt = fullPrompt.replace(regex, value);
     }
 
     const model = overrideModel || (modelSettings as any)?.model || "google/gemini-2.5-flash";
 
-    // Call AI Gateway
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Call Gemini API
+    const aiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
+        Authorization: `Bearer ${geminiApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -419,14 +406,14 @@ serve(async (req) => {
     if (!aiResponse.ok) {
       const status = aiResponse.status;
       const errBody = await aiResponse.text();
-      console.error("AI gateway error:", status, errBody);
+      console.error("AI error:", status, errBody);
       if (status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Try again later." }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      throw new Error(`AI gateway error: ${status}`);
+      throw new Error(`AI error: ${status}`);
     }
 
     const aiData = await aiResponse.json();
@@ -439,30 +426,22 @@ serve(async (req) => {
         .replace(/```\s*/g, "")
         .trim();
 
-      // If it doesn't look like JSON, return as-is
       if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return trimmed;
 
       try {
         const parsed = JSON.parse(trimmed);
         if (typeof parsed !== "object" || parsed === null) return trimmed;
 
-        // For statements: the AI sometimes wraps in {question: {comando: "..."}}
-        // We KEEP the full JSON for statements — the renderer handles it
         if (fieldAction === "generate_question") return trimmed;
-
-        // For answer_key: keep full JSON — renderer handles T1-T5 structure
         if (fieldAction === "generate_answer_key") return trimmed;
 
-        // For model_answer: extract the actual text content — NEVER save JSON
         if (fieldAction === "generate_model_answer") {
-          // Try common keys for the answer text (top-level and nested)
           const textKeys = ["resposta", "resposta_modelo", "model_answer", "modelo_resposta", "texto", "text", "answer", "content"];
           for (const key of textKeys) {
             if (parsed[key]) {
               const val = parsed[key];
               if (typeof val === "string" && val.length > 50) return val;
               if (typeof val === "object" && val !== null) {
-                // Deep extract: check .text, .content, .resposta inside nested object
                 for (const innerKey of ["text", "content", "resposta", "modelo"]) {
                   if ((val as Record<string, unknown>)[innerKey] && typeof (val as Record<string, unknown>)[innerKey] === "string") {
                     return String((val as Record<string, unknown>)[innerKey]);
@@ -471,7 +450,6 @@ serve(async (req) => {
               }
             }
           }
-          // Last resort: find the longest string value in the object (likely the essay)
           let longestStr = "";
           function findLongestString(obj: Record<string, unknown>) {
             for (const v of Object.values(obj)) {
@@ -481,14 +459,13 @@ serve(async (req) => {
           }
           findLongestString(parsed);
           if (longestStr.length > 100) return longestStr;
-          // If we truly can't find text, return JSON but log warning
           console.warn("Could not extract text from model_answer JSON, returning raw");
           return trimmed;
         }
 
         return trimmed;
       } catch {
-        return trimmed; // Not valid JSON, return as-is
+        return trimmed;
       }
     }
 
@@ -514,13 +491,11 @@ serve(async (req) => {
     let result: Record<string, unknown> = { generated_text: generatedText, truncated: isTruncated };
 
     if (action === "generate_question") {
-      // Validate: statement must not be empty or just whitespace
       if (!generatedText || generatedText.trim().length < 20) {
         return new Response(JSON.stringify({ error: "AI generated empty or too short statement. Try again." }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      // Create new question
       const { data: newQ, error: qErr } = await supabaseAdmin
         .from("dissertative_questions")
         .insert({
