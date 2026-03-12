@@ -29,7 +29,8 @@ export default defineConfig(({ mode }) => ({
     dedupe: ["react", "react-dom"],
   },
   build: {
-    target: 'es2022'
+    target: 'es2022',
+    chunkSizeWarningLimit: 1000
   },
   optimizeDeps: {
     esbuildOptions: {
