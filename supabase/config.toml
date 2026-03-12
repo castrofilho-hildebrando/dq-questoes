@@ -1,0 +1,68 @@
+project_id = "pwgordrpgfxhcczsnqpk"
+
+[functions.check-email-authorization]
+verify_jwt = false
+
+[functions.guru-webhook]
+verify_jwt = false
+
+[functions.send-trial-expiration-email]
+verify_jwt = false
+
+[functions.send-trial-welcome-email]
+verify_jwt = false
+
+[functions.map-edital-topics]
+verify_jwt = false
+
+[functions.verticalize-edital-topics]
+verify_jwt = false
+
+[functions.openai-tutor]
+verify_jwt = false
+
+[functions.import-questions-batch]
+verify_jwt = false
+
+[functions.scrape-provas]
+verify_jwt = false
+
+[functions.scrape-prova-details]
+verify_jwt = false
+
+[functions.save-provas]
+verify_jwt = false
+
+[functions.delete-provas-if]
+verify_jwt = false
+
+[functions.sync-workload-goals]
+verify_jwt = false
+
+[functions.correct-dissertative]
+verify_jwt = false
+
+[functions.generate-dissertative]
+verify_jwt = false
+
+[functions.send-authorized-welcome]
+verify_jwt = false
+
+[functions.full-backup-stream]
+verify_jwt = false
+
+[functions.storage-backup-stream]
+verify_jwt = false
+
+[functions.calendly-webhook]
+verify_jwt = false
+
+[functions.export-schema-ddl]
+verify_jwt = false
+
+[functions.send-password-reset]
+verify_jwt = false
+
+[functions.log-auth-error]
+verify_jwt = false
+
