@@ -32,11 +32,7 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
   const queryClient = useQueryClient();
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
 
-  // Passa direto se a rota atual não precisa de guard
   const isUnguarded = UNGUARDED_PATHS.includes(window.location.pathname);
-  if (isUnguarded) {
-    return <>{children}</>;
-  }
 
   // Fetch all active areas
   const { data: allAreas, isLoading: areasLoading, error: areasError } = useQuery({
@@ -51,13 +47,13 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
       if (error) throw error;
       return data as Area[];
     },
-    enabled: !!user,
+    enabled: !!user && !isUnguarded,
   });
 
   // Detect expired session: if user exists but areas query fails or returns empty
   // (there are always active areas in production), force session refresh
   useEffect(() => {
-    if (!user || areasLoading) return;
+    if (isUnguarded || !user || areasLoading) return;
     if (areasError || (allAreas && allAreas.length === 0)) {
       console.warn("Session may be expired: areas query returned empty/error. Attempting refresh...");
       supabase.auth.refreshSession().then(({ error }) => {
@@ -65,14 +61,13 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
           console.warn("Session refresh failed, signing out:", error.message);
           supabase.auth.signOut();
         } else {
-          // Refresh succeeded, invalidate queries to re-fetch with fresh token
           queryClient.invalidateQueries({ queryKey: ["all-areas"] });
           queryClient.invalidateQueries({ queryKey: ["user-areas"] });
           queryClient.invalidateQueries({ queryKey: ["user-profile-cpf"] });
         }
       });
     }
-  }, [user, areasLoading, areasError, allAreas, queryClient]);
+  }, [isUnguarded, user, areasLoading, areasError, allAreas, queryClient]);
 
   // Check if user has CPF
   const { data: userProfile, isLoading: profileLoading } = useQuery({
@@ -87,7 +82,7 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !isUnguarded,
   });
 
   // Fetch user's current areas
@@ -104,7 +99,7 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !isUnguarded,
   });
 
   // Save areas mutation
@@ -112,13 +107,11 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
     mutationFn: async (areaIds: string[]) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      // Delete existing areas
       await supabase
         .from("user_areas")
         .delete()
         .eq("user_id", user.id);
 
-      // Insert new areas
       if (areaIds.length > 0) {
         const { error } = await supabase
           .from("user_areas")
@@ -161,6 +154,11 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
     }
     saveMutation.mutate(selectedAreas);
   };
+
+  // Passa direto se a rota atual não precisa de guard — APÓS todos os hooks
+  if (isUnguarded) {
+    return <>{children}</>;
+  }
 
   // Loading state
   if (authLoading || areasLoading || userAreasLoading || profileLoading) {
