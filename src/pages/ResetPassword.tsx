@@ -16,10 +16,18 @@ export default function ResetPassword() {
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    // Check if we have a valid recovery session
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
+    // Ouve o evento PASSWORD_RECOVERY disparado pelo Supabase ao processar
+    // o token de recovery que vem no hash da URL
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" && session) {
+        setIsValidSession(true);
+        setCheckingSession(false);
+      }
+    });
+
+    // Verifica se já há uma sessão de recovery ativa (caso o evento já tenha
+    // sido disparado antes deste componente montar)
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setIsValidSession(true);
       } else {
@@ -27,9 +35,9 @@ export default function ResetPassword() {
         navigate("/auth");
       }
       setCheckingSession(false);
-    };
+    });
 
-    checkSession();
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -57,7 +65,9 @@ export default function ResetPassword() {
       }
 
       toast.success("Senha atualizada com sucesso!");
-      navigate("/");
+      // Encerra a sessão de recovery e redireciona para login
+      await supabase.auth.signOut();
+      navigate("/auth");
     } catch (error) {
       console.error("Error:", error);
       toast.error("Erro ao atualizar senha");
@@ -87,14 +97,14 @@ export default function ResetPassword() {
             background: 'radial-gradient(ellipse at bottom right, hsl(280, 50%, 12%) 0%, transparent 50%), radial-gradient(ellipse at top left, hsl(185, 80%, 10%) 0%, transparent 40%)'
           }} />
         </div>
-        
+
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0" style={{
             backgroundImage: `linear-gradient(hsl(185, 100%, 50%) 1px, transparent 1px), linear-gradient(90deg, hsl(185, 100%, 50%) 1px, transparent 1px)`,
             backgroundSize: '40px 40px'
           }} />
         </div>
-        
+
         <div className="relative z-10 flex flex-col justify-center items-center w-full p-12">
           <div className="w-20 h-20 rounded-2xl bg-card border border-border flex items-center justify-center mb-8 shadow-glow-cyan">
             <Scissors className="w-10 h-10 text-primary" />
