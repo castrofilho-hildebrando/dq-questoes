@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
 
   try {
     const { email } = await req.json()
-    
+
     if (!email) {
       return new Response(
         JSON.stringify({ authorized: false, error: 'Email is required' }),
@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     const normalizedEmail = email.toLowerCase().trim()
@@ -38,36 +38,48 @@ Deno.serve(async (req) => {
       .eq('is_active', true)
       .maybeSingle()
 
+    // CORREÇÃO: erro na query de autorização é tratado como erro técnico,
+    // não como "email não autorizado", para evitar falso negativo ao aluno.
     if (authError) {
       console.error('Error checking authorized_emails:', authError)
+      return new Response(
+        JSON.stringify({ technical_error: true, error: 'Erro ao verificar autorização. Tente novamente.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      )
     }
 
-    // Check if user exists using indexed query on profiles table (O(1) with index)
-    // This is the primary method - fast and scalable for any number of users
+    // Email não está na lista — retorno limpo sem ambiguidade
+    if (!authorized) {
+      console.log(`Email not authorized: ${normalizedEmail}`)
+      return new Response(
+        JSON.stringify({ authorized: false, exists: false }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      )
+    }
+
+    // Email autorizado — verificar se o usuário já completou o cadastro
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('user_id')
       .eq('email', normalizedEmail)
       .maybeSingle()
-    
+
     let existingAuthUser = false
-    
+
     if (profileData && !profileError) {
       existingAuthUser = true
       console.log(`User found in profiles: ${profileData.user_id}`)
     } else {
-      // Fallback: Direct lookup using admin API (for edge case where profile doesn't exist)
-      // This should rarely happen if sync is working properly
+      // Fallback: busca direta em auth.users para o caso de o profile ainda não ter sido criado
+      // pelo trigger handle_new_user (race condition pós-signUp)
       console.log('Profile not found, checking auth.users directly...')
-      
+
       try {
-        // Use admin API to list users and find by email
-        // We paginate in small chunks for efficiency
         const { data: authData, error: authUserError } = await supabase.auth.admin.listUsers({
           page: 1,
-          perPage: 1000
+          perPage: 1000,
         })
-        
+
         if (!authUserError && authData?.users) {
           const foundUser = authData.users.find(
             (u: any) => u.email?.toLowerCase() === normalizedEmail
@@ -75,16 +87,16 @@ Deno.serve(async (req) => {
           if (foundUser) {
             existingAuthUser = true
             console.log(`User found in auth.users: ${foundUser.id}`)
-            
-            // Auto-create missing profile for data consistency
+
+            // Cria o profile ausente para consistência dos dados
             const { error: insertError } = await supabase
               .from('profiles')
               .insert({
                 user_id: foundUser.id,
                 email: normalizedEmail,
-                full_name: foundUser.user_metadata?.full_name || null
+                full_name: foundUser.user_metadata?.full_name || null,
               })
-            
+
             if (!insertError) {
               console.log(`Auto-created missing profile for ${normalizedEmail}`)
             }
@@ -95,19 +107,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Result - authorized: ${!!authorized}, exists: ${existingAuthUser}`)
+    console.log(`Result - authorized: true, exists: ${existingAuthUser}`)
 
     return new Response(
-      JSON.stringify({ 
-        authorized: !!authorized,
-        exists: existingAuthUser
+      JSON.stringify({
+        authorized: true,
+        exists: existingAuthUser,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error) {
     console.error('Error checking email:', error)
     return new Response(
-      JSON.stringify({ authorized: false, error: 'Internal server error' }),
+      JSON.stringify({ technical_error: true, error: 'Internal server error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }

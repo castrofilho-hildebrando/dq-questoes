@@ -90,6 +90,14 @@ export default function Auth() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  // ------------------------------------------------------------------
+  // FUNÇÃO 1: checkEmailAuthorization
+  // Substitui a versão atual integralmente.
+  // Diferença principal: distingue erro técnico (technical_error: true
+  // ou response não-ok) de email genuinamente não autorizado,
+  // evitando falso negativo ao aluno em caso de falha da edge function.
+  // ------------------------------------------------------------------
+
   const checkEmailAuthorization = async () => {
     if (!email) {
       toast.error("Por favor, insira seu email");
@@ -100,17 +108,33 @@ export default function Auth() {
     try {
       const normalizedEmail = email.toLowerCase().trim();
 
-      // Use edge function to check authorization (secure - doesn't expose email list)
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-email-authorization`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: normalizedEmail })
+          body: JSON.stringify({ email: normalizedEmail }),
         }
       );
 
+      // Erro técnico HTTP (5xx, rede, cold start)
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        if (body?.technical_error) {
+          toast.error("Erro ao verificar email. Aguarde alguns segundos e tente novamente.");
+        } else {
+          toast.error("Erro ao verificar email. Tente novamente.");
+        }
+        return;
+      }
+
       const result = await response.json();
+
+      // Erro técnico indicado no corpo mesmo com status 200 (defensive)
+      if (result?.technical_error) {
+        toast.error("Erro ao verificar email. Aguarde alguns segundos e tente novamente.");
+        return;
+      }
 
       if (!result.authorized) {
         toast.error("Email não autorizado. Entre em contato com o administrador.");
@@ -118,23 +142,28 @@ export default function Auth() {
       }
 
       if (result.exists) {
-        // User exists, go to login
         setStep("login");
       } else {
-        // New user, go to registration
         setStep("register");
       }
     } catch (error) {
       console.error("Error:", error);
-      toast.error("Erro ao verificar email");
+      toast.error("Erro ao verificar email. Verifique sua conexão e tente novamente.");
     } finally {
       setLoading(false);
     }
   };
 
+  // ============================================================
+  // PATCH PARA: src/pages/Auth.tsx — função handleRegister
+  //
+  // Usar após implantar a edge function register-student.
+  // Substitui integralmente a função handleRegister atual.
+  // ============================================================
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!name) {
       toast.error("Por favor, insira seu nome");
       return;
@@ -157,35 +186,41 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
-        email: email.toLowerCase().trim(),
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/register-student`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.toLowerCase().trim(),
+            password,
             full_name: name,
             cpf: formatCpf(cpf),
-          },
-        },
-      });
+          }),
+        }
+      );
 
-      if (error) {
-        // Log the error
-        logAuthError(error.message, (error as any).code, 'signup_failed', email);
-        
-        if (error.message.includes("already registered")) {
+      const result = await response.json();
+
+      if (!result.success) {
+        logAuthError(result.error || "signup_failed", undefined, 'signup_failed', email);
+
+        if (result.already_exists) {
           toast.error("Este email já está cadastrado. Faça login.");
           setStep("login");
-        } else {
-          toast.error(error.message);
+          return;
         }
+
+        toast.error(result.error || "Erro ao criar conta. Tente novamente.");
         return;
       }
 
-      toast.success("Conta criada com sucesso!");
+      // Cadastro bem-sucedido — avança direto para o login
+      toast.success("Conta criada com sucesso! Faça login para continuar.");
+      setStep("login");
     } catch (error) {
       console.error("Error:", error);
-      toast.error("Erro ao criar conta");
+      toast.error("Erro ao criar conta. Verifique sua conexão e tente novamente.");
     } finally {
       setLoading(false);
     }
