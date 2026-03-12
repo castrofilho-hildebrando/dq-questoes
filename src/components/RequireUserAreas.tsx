@@ -24,10 +24,19 @@ interface RequireUserAreasProps {
   children: React.ReactNode;
 }
 
+// Rotas que devem passar direto sem qualquer guard de áreas ou CPF
+const UNGUARDED_PATHS = ["/reset-password", "/auth", "/trial"];
+
 export function RequireUserAreas({ children }: RequireUserAreasProps) {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+
+  // Passa direto se a rota atual não precisa de guard
+  const isUnguarded = UNGUARDED_PATHS.includes(window.location.pathname);
+  if (isUnguarded) {
+    return <>{children}</>;
+  }
 
   // Fetch all active areas
   const { data: allAreas, isLoading: areasLoading, error: areasError } = useQuery({
@@ -38,7 +47,7 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
         .select("*")
         .eq("is_active", true)
         .order("name");
-      
+
       if (error) throw error;
       return data as Area[];
     },
@@ -86,12 +95,12 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
     queryKey: ["user-areas", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      
+
       const { data, error } = await supabase
         .from("user_areas")
         .select("area_id, areas(id, name)")
         .eq("user_id", user.id);
-      
+
       if (error) throw error;
       return data || [];
     },
@@ -117,7 +126,7 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
             user_id: user.id,
             area_id: areaId,
           })));
-        
+
         if (error) throw error;
       }
     },
@@ -191,7 +200,7 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
   // Show mandatory area selection dialog
   return (
     <Dialog open={true}>
-      <DialogContent 
+      <DialogContent
         className="sm:max-w-lg"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
@@ -212,8 +221,8 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
                 key={area.id}
                 onClick={() => toggleArea(area.id)}
                 className={`flex items-center justify-between p-4 rounded-lg border text-left transition-colors ${
-                  isSelected 
-                    ? "border-primary bg-primary/10" 
+                  isSelected
+                    ? "border-primary bg-primary/10"
                     : "border-border hover:border-primary/50"
                 }`}
               >
@@ -230,7 +239,7 @@ export function RequireUserAreas({ children }: RequireUserAreasProps) {
           <div className="text-sm text-muted-foreground text-center">
             {selectedAreas.length}/2 áreas selecionadas
           </div>
-          <Button 
+          <Button
             onClick={handleSave}
             disabled={selectedAreas.length === 0 || saveMutation.isPending}
             className="w-full"
