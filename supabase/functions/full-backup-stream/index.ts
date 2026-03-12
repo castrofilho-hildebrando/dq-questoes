@@ -48,7 +48,9 @@ Deno.serve(async (req) => {
     const from = page * pageSize;
     const to = from + pageSize - 1;
 
-    const { data, error } = await supabase.from(table).select("*").order("id").range(from, to);
+    const fields = url.searchParams.get("fields") ?? "*";
+
+    const { data, error } = await supabase.from(table).select(fields).order("id").range(from, to);
 
     if (error) throw error;
 
