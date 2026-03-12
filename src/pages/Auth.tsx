@@ -365,15 +365,8 @@ export default function Auth() {
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative z-10 gap-4">
-        {/* Manutenção programada - banner */}
-        <div className="w-full max-w-2xl rounded-2xl border-8 border-[#FAFA33] bg-[#373737] px-6 py-5 sm:px-8 sm:py-6 text-center text-white shadow-xl relative" style={{ top: '-40px', marginBottom: '-40px' }}>
-          <p className="text-base sm:text-lg font-semibold leading-relaxed tracking-wide">
-            ⚠️ O Dissecando Questões entrará em manutenção programada hoje, às 22 h, e retornará amanhã, às 04 h da manhã. Essa parada servirá para proporcionar a vocês, nossos queridos alunos, uma melhor experiência em nosso site.
-          </p>
-        </div>
-
-        <div className="w-full max-w-md bg-card/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-border shadow-lg">
+      <div className="flex-1 flex items-center justify-center p-8 relative z-10">
+        <div className="w-full max-w-md bg-card/80 backdrop-blur-sm rounded-2xl p-8 border border-border shadow-lg">
           {/* Mobile Logo */}
           <div className="lg:hidden flex flex-col items-center gap-4 mb-8">
             <div className="w-16 h-16 rounded-xl bg-card border border-border flex items-center justify-center">

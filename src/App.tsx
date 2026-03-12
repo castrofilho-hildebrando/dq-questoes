@@ -53,15 +53,6 @@ import DidaticaPlayer from "./pages/didatica/DidaticaPlayer";
 import TutoriaisHome from "./pages/tutoriais/TutoriaisHome";
 import TutoriaisPlayer from "./pages/tutoriais/TutoriaisPlayer";
 import Comunidades from "./pages/Comunidades";
-import logoDq from "@/assets/gateway/logo-dq.png";
-
-// =============================================================
-// MAINTENANCE MODE
-// Para ativar: definir VITE_MAINTENANCE_MODE=true nas variáveis
-// de ambiente do Lovable e fazer novo deploy.
-// Para desativar: remover a variável ou definir como false.
-// =============================================================
-const MAINTENANCE_MODE = true;
 
 const queryClient = new QueryClient();
 
@@ -93,30 +84,6 @@ const App = () => {
   useEffect(() => {
     cleanupLegacyStorage();
   }, []);
-
-  // =============================================================
-  // TELA DE MANUTENÇÃO
-  // Intercepta todas as rotas antes de qualquer provider montar.
-  // Nenhuma chamada ao Supabase é feita enquanto estiver ativo.
-  // =============================================================
-  if (MAINTENANCE_MODE) {
-    return (
-      <ThemeProvider defaultTheme="dark" storageKey="conselho-theme">
-        <div
-          className="min-h-screen flex items-center justify-center"
-          style={{ backgroundColor: "hsl(var(--background))" }}
-        >
-          <div className="text-center px-6 max-w-lg">
-            <img src={logoDq} alt="Dissecando Questões" className="h-16 mx-auto mb-8 opacity-90" />
-            <h1 className="text-3xl font-bold text-white mb-4">Sistema em Manutenção</h1>
-            <p className="text-muted-foreground text-lg leading-relaxed">
-              O Dissecando Questões está temporariamente fora do ar para melhorias técnicas. Voltaremos brevemente.
-            </p>
-          </div>
-        </div>
-      </ThemeProvider>
-    );
-  }
 
   return (
     <ErrorBoundary>

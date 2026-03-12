@@ -131,15 +131,6 @@ const Gateway = () => {
         <GatewayUserMenu />
       </div>
 
-      {/* Banner de manutenção programada */}
-      <div className="max-w-4xl mx-auto px-6 pt-8 relative z-10">
-        <div className="w-full rounded-2xl border-8 border-[#FAFA33] bg-[#373737] px-6 py-5 sm:px-8 sm:py-6 text-center text-white shadow-xl">
-          <p className="text-base sm:text-lg font-semibold leading-relaxed tracking-wide">
-            ⚠️ O Dissecando Questões entrará em manutenção programada hoje, às 22 h, e retornará amanhã, às 04 h da manhã. Essa parada servirá para proporcionar a vocês, nossos queridos alunos, uma melhor experiência em nosso site.
-          </p>
-        </div>
-      </div>
-
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8 relative z-10">
         {dynamicSections.map((section, i) => (
