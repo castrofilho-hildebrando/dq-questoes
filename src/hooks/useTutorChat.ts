@@ -50,13 +50,6 @@ export function useTutorChat({ robotId, systemPrompt, model = "gpt-4o" }: UseTut
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token;
-
-      if (!accessToken) {
-        setError("Sessão expirada. Faça login novamente.");
-        setIsLoading(false);
-        return;
-      }
-
       const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
       const response = await fetch(
@@ -66,7 +59,7 @@ export function useTutorChat({ robotId, systemPrompt, model = "gpt-4o" }: UseTut
           headers: {
             "Content-Type": "application/json",
             "apikey": anonKey,
-            "Authorization": `Bearer ${accessToken}`,
+            "Authorization": `Bearer ${accessToken || anonKey}`,
           },
           body: JSON.stringify({
             messages: apiMessages,
