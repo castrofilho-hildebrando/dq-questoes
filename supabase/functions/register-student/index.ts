@@ -93,6 +93,27 @@ Deno.serve(async (req) => {
 
     console.log(`Student registered successfully: ${newUser.user.id}`)
 
+    // Garante que o perfil existe com CPF e nome preenchidos.
+    // O trigger handle_new_user pode criar o perfil, mas não copia CPF do user_metadata.
+    // Upsert garante que o dado esteja disponível imediatamente após o cadastro.
+    const { error: profileError } = await adminClient
+      .from('profiles')
+      .upsert(
+        {
+          user_id: newUser.user.id,
+          email: normalizedEmail,
+          full_name: full_name || null,
+          cpf: cpf || null,
+        },
+        { onConflict: 'user_id' }
+      )
+
+    if (profileError) {
+      console.error('Error upserting profile (non-fatal):', profileError)
+    } else {
+      console.log(`Profile upserted for: ${newUser.user.id}`)
+    }
+
     return new Response(
       JSON.stringify({ success: true, user_id: newUser.user.id }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }

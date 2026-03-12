@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     target: 'es2022',
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 2000
   },
   optimizeDeps: {
     esbuildOptions: {
