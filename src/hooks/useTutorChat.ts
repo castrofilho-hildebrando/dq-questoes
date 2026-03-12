@@ -50,6 +50,13 @@ export function useTutorChat({ robotId, systemPrompt, model = "gpt-4o" }: UseTut
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token;
+
+      if (!accessToken) {
+        setError("Sessão expirada. Faça login novamente.");
+        setIsLoading(false);
+        return;
+      }
+
       const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
       const response = await fetch(
@@ -59,7 +66,7 @@ export function useTutorChat({ robotId, systemPrompt, model = "gpt-4o" }: UseTut
           headers: {
             "Content-Type": "application/json",
             "apikey": anonKey,
-            "Authorization": `Bearer ${accessToken || anonKey}`,
+            "Authorization": `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             messages: apiMessages,
@@ -119,9 +126,9 @@ export function useTutorChat({ robotId, systemPrompt, model = "gpt-4o" }: UseTut
             const delta = parsed.choices?.[0]?.delta?.content;
             if (delta) {
               assistantContent += delta;
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantMessage.id
+              setMessages(prev => 
+                prev.map(m => 
+                  m.id === assistantMessage.id 
                     ? { ...m, content: assistantContent }
                     : m
                 )
@@ -147,9 +154,9 @@ export function useTutorChat({ robotId, systemPrompt, model = "gpt-4o" }: UseTut
             const delta = parsed.choices?.[0]?.delta?.content;
             if (delta) {
               assistantContent += delta;
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantMessage.id
+              setMessages(prev => 
+                prev.map(m => 
+                  m.id === assistantMessage.id 
                     ? { ...m, content: assistantContent }
                     : m
                 )

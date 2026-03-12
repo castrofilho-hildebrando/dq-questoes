@@ -29,8 +29,7 @@ export default defineConfig(({ mode }) => ({
     dedupe: ["react", "react-dom"],
   },
   build: {
-    target: 'es2022',
-    sourcemap: true,
+    target: 'es2022'
   },
   optimizeDeps: {
     esbuildOptions: {
