@@ -26,10 +26,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-
-    if (!openaiApiKey) {
-      throw new Error("OPENAI_API_KEY is not configured");
-    }
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -190,16 +187,24 @@ serve(async (req) => {
       fullPrompt = fullPrompt.replace(regex, value);
     }
 
+    const rawModel = (modelSettings as any)?.model || "gemini-2.5-flash";
+    const isGemini = rawModel.startsWith("google/") || rawModel.startsWith("gemini-") || rawModel.includes("gemini");
+    // Strip "google/" prefix when calling Google's direct API (OpenRouter format not accepted)
+    const model = isGemini && rawModel.startsWith("google/") ? rawModel.slice(7) : rawModel;
+    const aiApiKey = isGemini ? geminiApiKey : openaiApiKey;
+    const aiEndpoint = isGemini
+      ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+      : "https://api.openai.com/v1/chat/completions";
 
+    if (!aiApiKey) {
+      throw new Error(isGemini ? "GEMINI_API_KEY is not configured" : "OPENAI_API_KEY is not configured");
+    }
 
-
-    const model = "gpt-4o";
-
-    // Call OpenAI API
-    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    // Call AI API (OpenAI-compatible endpoint for both providers)
+    const aiResponse = await fetch(aiEndpoint, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${openaiApiKey}`,
+        Authorization: `Bearer ${aiApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

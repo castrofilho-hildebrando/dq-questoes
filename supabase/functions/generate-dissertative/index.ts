@@ -135,7 +135,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "gemini-2.5-flash",
           messages: [
             {
               role: "user",
@@ -385,7 +385,9 @@ serve(async (req) => {
       fullPrompt = fullPrompt.replace(regex, value);
     }
 
-    const model = overrideModel || (modelSettings as any)?.model || "google/gemini-2.5-flash";
+    // Strip "google/" prefix if present (OpenRouter format not accepted by Google's direct API)
+    const rawModel = overrideModel || (modelSettings as any)?.model || "gemini-2.5-flash";
+    const model = rawModel.startsWith("google/") ? rawModel.slice(7) : rawModel;
 
     // Call Gemini API
     const aiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
